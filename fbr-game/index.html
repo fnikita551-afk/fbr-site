@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ФБР - Федеральное Бюро Ролевых игр</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Временные стили пока не создан style.css */
+        body { 
+            font-family: 'Roboto', sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background: #0a0a2a; 
+            color: white;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 0 20px; 
+        }
+        .btn { 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-weight: bold; 
+        }
+        .btn-primary { 
+            background: #0066cc; 
+            color: white; 
+        }
+        .modal { 
+            display: none; 
+            position: fixed; 
+            top: 0; left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.8); 
+            z-index: 1000; 
+        }
+        .modal-content { 
+            background: #1a1a3a; 
+            padding: 20px; 
+            border-radius: 10px; 
+            max-width: 500px; 
+            margin: 50px auto; 
+        }
+    </style>
+</head>
+<body>
+    <!-- Экран загрузки -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loader">
+                <div class="fbi-logo">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h2>Федеральное Бюро Ролевых игр</h2>
+                <p>Проверка доступа...</p>
+                <div class="loading-bar">
+                    <div class="loading-progress"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Главный контент (скрыт до авторизации) -->
+    <div id="mainContent" style="display: none;">
+        <!-- Шапка сайта -->
+        <header class="header">
+            <div class="container">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="logo-text">
+                        <span class="fbi">ФБР</span>
+                        <span class="online">Онлайн</span>
+                    </div>
+                </div>
+                
+                <nav class="navbar">
+                    <a href="#dashboard" class="nav-link active" data-page="dashboard">
+                        <i class="fas fa-home"></i>
+                        <span>Главная</span>
+                    </a>
+                    <a href="#members" class="nav-link" data-page="members">
+                        <i class="fas fa-users"></i>
+                        <span>Агенты</span>
+                    </a>
+                    <a href="#tasks" class="nav-link" data-page="tasks">
+                        <i class="fas fa-tasks"></i>
+                        <span>Задания</span>
+                    </a>
+                    <a href="#admin" class="nav-link admin-only" data-page="admin" style="display: none;">
+                        <i class="fas fa-user-shield"></i>
+                        <span>Панель управления</span>
+                    </a>
+                </nav>
+                
+                <div class="user-info">
+                    <div class="user-avatar" id="userAvatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-details">
+                        <span class="user-name" id="userName">Гость</span>
+                        <span class="user-rank" id="userRank">Не авторизован</span>
+                    </div>
+                    <button id="logoutBtn" class="btn-logout" title="Выйти">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Основное содержимое -->
+        <main class="main-content">
+            <!-- Дашборд -->
+            <section id="dashboard" class="page active">
+                <div class="container">
+                    <div class="dashboard-header">
+                        <h1><i class="fas fa-chart-line"></i> Командный центр ФБР</h1>
+                        <p class="dashboard-subtitle">Добро пожаловать в систему Федерального Бюро Ролевых игр</p>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: #2a5298;">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="totalAgents">0</h3>
+                                <p>Всего агентов</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: #27ae60;">
+                                <i class="fas fa-tasks"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="activeTasks">0</h3>
+                                <p>Активные задания</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: #e74c3c;">
+                                <i class="fas fa-user-clock"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="pendingApprovals">0</h3>
+                                <p>Ожидают одобрения</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: #f39c12;">
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="completedMissions">0</h3>
+                                <p>Выполнено миссий</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="welcome-message">
+                        <h2><i class="fas fa-bullhorn"></i> Важная информация</h2>
+                        <div class="message-card">
+                            <p>Добро пожаловать в закрытую систему ФБР. Все действия записываются и контролируются.</p>
+                            <p>Для доступа к полному функционалу требуется подтверждение регистрации руководством.</p>
+                            <div class="status-info" id="userStatusInfo">
+                                <!-- Статус пользователя загружается здесь -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Страница агентов -->
+            <section id="members" class="page">
+                <div class="container">
+                    <div class="page-header">
+                        <h1><i class="fas fa-users"></i> База данных агентов</h1>
+                        <div class="page-actions">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="searchAgent" placeholder="Поиск агента...">
+                            </div>
+                            <button class="btn btn-primary" onclick="refreshAgents()">
+                                <i class="fas fa-sync-alt"></i> Обновить
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="filters">
+                        <button class="filter-btn active" data-rank="all">Все</button>
+                        <button class="filter-btn" data-rank="Новичок">Новички</button>
+                        <button class="filter-btn" data-rank="Агент">Агенты</button>
+                        <button class="filter-btn" data-rank="Спецагент">Спецагенты</button>
+                        <button class="filter-btn" data-rank="Директор">Руководство</button>
+                    </div>
+                    
+                    <div class="agents-table-container">
+                        <table class="agents-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Имя агента</th>
+                                    <th>Ранг</th>
+                                    <th>Дата вступления</th>
+                                    <th>Статус</th>
+                                    <th>Выполнено заданий</th>
+                                </tr>
+                            </thead>
+                            <tbody id="agentsTableBody">
+                                <!-- Данные загружаются через JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Страница заданий -->
+            <section id="tasks" class="page">
+                <div class="container">
+                    <div class="page-header">
+                        <h1><i class="fas fa-tasks"></i> Система заданий</h1>
+                        <div class="task-filters">
+                            <select id="taskFilter" class="task-select">
+                                <option value="all">Все задания</option>
+                                <option value="available">Доступные мне</option>
+                                <option value="active">Активные</option>
+                                <option value="completed">Выполненные</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="tasks-grid" id="tasksGrid">
+                        <!-- Задания загружаются через JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Админ панель (только для руководства) -->
+            <section id="admin" class="page">
+                <div class="container">
+                    <div class="page-header">
+                        <h1><i class="fas fa-user-shield"></i> Панель управления</h1>
+                        <p class="admin-subtitle">Управление регистрациями и аккаунтами агентов</p>
+                    </div>
+                    
+                    <div class="admin-tabs">
+                        <button class="admin-tab active" data-tab="registrations">
+                            <i class="fas fa-user-plus"></i> Регистрации
+                            <span class="badge" id="pendingCount">0</span>
+                        </button>
+                        <button class="admin-tab" data-tab="agents">
+                            <i class="fas fa-users-cog"></i> Управление агентами
+                        </button>
+                        <button class="admin-tab" data-tab="tasks-admin">
+                            <i class="fas fa-tasks"></i> Управление заданиями
+                        </button>
+                    </div>
+                    
+                    <!-- Вкладка регистраций -->
+                    <div class="admin-tab-content active" id="registrationsTab">
+                        <h3><i class="fas fa-clock"></i> Заявки на регистрацию</h3>
+                        <div class="registrations-list" id="registrationsList">
+                            <!-- Заявки загружаются через JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Вкладка управления агентами -->
+                    <div class="admin-tab-content" id="agentsTab">
+                        <h3><i class="fas fa-user-cog"></i> Управление агентами</h3>
+                        <div class="agents-management" id="agentsManagement">
+                            <!-- Управление агентами -->
+                        </div>
+                    </div>
+                    
+                    <!-- Вкладка управления заданиями -->
+                    <div class="admin-tab-content" id="tasksAdminTab">
+                        <h3><i class="fas fa-plus-circle"></i> Создать новое задание</h3>
+                        <div class="create-task-form">
+                            <input type="text" id="newTaskTitle" placeholder="Название задания" class="task-input">
+                            <textarea id="newTaskDesc" placeholder="Описание задания" class="task-textarea"></textarea>
+                            <select id="newTaskRank" class="task-select">
+                                <option value="Новичок">Для новичков</option>
+                                <option value="Агент">Для агентов</option>
+                                <option value="Спецагент">Для спецагентов</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="createNewTask()">
+                                <i class="fas fa-plus"></i> Создать задание
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Модальное окно задания -->
+        <div id="taskModal" class="modal">
+            <div class="modal-content task-modal">
+                <div class="modal-header">
+                    <h3><i class="fas fa-file-alt"></i> <span id="modalTaskTitle"></span></h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="task-details">
+                        <p><strong><i class="fas fa-align-left"></i> Описание:</strong></p>
+                        <p id="modalTaskDesc"></p>
+                        
+                        <div class="task-meta">
+                            <div class="meta-item">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Сложность: <strong id="modalTaskDifficulty"></strong></span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-medal"></i>
+                                <span>Ранг: <strong id="modalTaskRank"></strong></span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-gem"></i>
+                                <span>Награда: <strong id="modalTaskReward"></strong></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="proof-section">
+                        <h4><i class="fas fa-paperclip"></i> Отчет о выполнении</h4>
+                        <p class="proof-hint">Предоставьте доказательства выполнения задания:</p>
+                        <textarea id="proofText" placeholder="Опишите ваши действия, прикрепите ссылки на скриншоты или другие доказательства..."></textarea>
+                        <div class="proof-actions">
+                            <button id="submitProofBtn" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i> Отправить на проверку
+                            </button>
+                            <button id="cancelTaskBtn" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Отмена
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно регистрации -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-plus"></i> Заявка на вступление в ФБР</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="register-info">
+                    <p><i class="fas fa-info-circle"></i> Регистрация требует одобрения руководства. После подачи заявки ожидайте решения.</p>
+                </div>
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="regUsername">
+                            <i class="fas fa-user"></i> Игровое имя (никнейм)
+                        </label>
+                        <input type="text" id="regUsername" placeholder="Придумайте уникальное имя" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="regEmail">
+                            <i class="fas fa-envelope"></i> Электронная почта
+                        </label>
+                        <input type="email" id="regEmail" placeholder="example@mail.com" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="regPassword">
+                            <i class="fas fa-lock"></i> Пароль
+                        </label>
+                        <input type="password" id="regPassword" placeholder="Минимум 8 символов" required minlength="8">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="regConfirm">
+                            <i class="fas fa-lock"></i> Подтвердите пароль
+                        </label>
+                        <input type="password" id="regConfirm" placeholder="Повторите пароль" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="regCharacter">
+                            <i class="fas fa-id-card"></i> Выберите роль
+                        </label>
+                        <select id="regCharacter" required>
+                            <option value="">-- Выберите специализацию --</option>
+                            <option value="detective">Детектив (расследования)</option>
+                            <option value="field_agent">Полевой агент</option>
+                            <option value="analyst">Аналитик</option>
+                            <option value="tech">Технический специалист</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="regMotivation">
+                            <i class="fas fa-comment"></i> Почему вы хотите вступить в ФБР?
+                        </label>
+                        <textarea id="regMotivation" placeholder="Кратко опишите вашу мотивацию..." rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-paper-plane"></i> Отправить заявку
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-block" onclick="closeModal('registerModal')">
+                            <i class="fas fa-times"></i> Отмена
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно входа -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-sign-in-alt"></i> Вход в систему ФБР</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginEmail">
+                            <i class="fas fa-envelope"></i> Электронная почта
+                        </label>
+                        <input type="email" id="loginEmail" placeholder="Введите ваш email" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="loginPassword">
+                            <i class="fas fa-lock"></i> Пароль
+                        </label>
+                        <input type="password" id="loginPassword" placeholder="Введите ваш пароль" required>
+                    </div>
+                    
+                    <div class="login-status" id="loginStatus">
+                        <!-- Статус входа -->
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-sign-in-alt"></i> Войти
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-block" onclick="showRegisterModal()">
+                            <i class="fas fa-user-plus"></i> Нет аккаунта?
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно статуса регистрации -->
+    <div id="statusModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-hourglass-half"></i> Статус вашей заявки</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="status-content" id="statusContent">
+                    <!-- Информация о статусе -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Временный код для инициализации
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('loginModal').style.display = 'block';
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1110 @@
+// Глобальные переменные
+let currentUser = null;
+let allUsers = [];
+let allTasks = [];
+let pendingRegistrations = [];
+
+// Данные по умолчанию (в реальном проекте будут с сервера)
+const DEFAULT_USERS = [
+    {
+        id: 1,
+        username: "Алексей Вольнов",
+        email: "director@fbr.ru",
+        password: "admin123",
+        rank: "Директор ФБР",
+        joinDate: "15.01.2023",
+        status: "approved",
+        isAdmin: true,
+        completedTasks: 47,
+        character: "director"
+    },
+    {
+        id: 2,
+        username: "Максим Светлов",
+        email: "deputy@fbr.ru",
+        password: "agent123",
+        rank: "Заместитель директора",
+        joinDate: "20.03.2023",
+        status: "approved",
+        isAdmin: true,
+        completedTasks: 32,
+        character: "field_agent"
+    },
+    {
+        id: 3,
+        username: "Дмитрий Кретов",
+        email: "agent@fbr.ru",
+        password: "agent123",
+        rank: "Старший агент",
+        joinDate: "05.05.2023",
+        status: "approved",
+        isAdmin: false,
+        completedTasks: 18,
+        character: "detective"
+    }
+];
+
+const DEFAULT_TASKS = [
+    {
+        id: 1,
+        title: "Расследование ограбления банка",
+        description: "Найдите и проанализируйте улики на месте преступления. Соберите показания свидетелей.",
+        difficulty: "medium",
+        requiredRank: "Новичок",
+        reward: "Повышение до Агента",
+        status: "available"
+    },
+    {
+        id: 2,
+        title: "Внедрение в преступную группировку",
+        description: "Внедритесь в группировку и соберите информацию об их деятельности.",
+        difficulty: "hard",
+        requiredRank: "Агент",
+        reward: "Специальное звание",
+        status: "available"
+    },
+    {
+        id: 3,
+        title: "Анализ перехваченных сообщений",
+        description: "Расшифруйте и проанализируйте перехваченные радиопередачи.",
+        difficulty: "easy",
+        requiredRank: "Новичок",
+        reward: "Бонусные очки",
+        status: "available"
+    },
+    {
+        id: 4,
+        title: "Охрана важного свидетеля",
+        description: "Обеспечьте безопасность свидетеля до судебного заседания.",
+        difficulty: "hard",
+        requiredRank: "Спецагент",
+        reward: "Медаль отличия",
+        status: "available"
+    }
+];
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    // Загрузка данных из localStorage
+    loadFromLocalStorage();
+    
+    // Инициализация экрана загрузки
+    setTimeout(function() {
+        document.getElementById('loadingScreen').style.display = 'none';
+        
+        // Проверяем, авторизован ли пользователь
+        const savedUser = localStorage.getItem('fbr_currentUser');
+        if (savedUser) {
+            currentUser = JSON.parse(savedUser);
+            initializeApp();
+        } else {
+            // Показываем окно входа
+            showModal('loginModal');
+        }
+    }, 2000);
+    
+    // Настройка навигации
+    setupNavigation();
+    
+    // Настройка обработчиков событий
+    setupEventHandlers();
+});
+
+// Загрузка данных из localStorage
+function loadFromLocalStorage() {
+    // Загрузка пользователей
+    const savedUsers = localStorage.getItem('fbr_users');
+    allUsers = savedUsers ? JSON.parse(savedUsers) : DEFAULT_USERS;
+    
+    // Загрузка заданий
+    const savedTasks = localStorage.getItem('fbr_tasks');
+    allTasks = savedTasks ? JSON.parse(savedTasks) : DEFAULT_TASKS;
+    
+    // Загрузка заявок на регистрацию
+    const savedRegistrations = localStorage.getItem('fbr_registrations');
+    pendingRegistrations = savedRegistrations ? JSON.parse(savedRegistrations) : [];
+}
+
+// Сохранение данных в localStorage
+function saveToLocalStorage() {
+    localStorage.setItem('fbr_users', JSON.stringify(allUsers));
+    localStorage.setItem('fbr_tasks', JSON.stringify(allTasks));
+    localStorage.setItem('fbr_registrations', JSON.stringify(pendingRegistrations));
+    if (currentUser) {
+        localStorage.setItem('fbr_currentUser', JSON.stringify(currentUser));
+    }
+}
+
+// Инициализация приложения после входа
+function initializeApp() {
+    // Показываем основной контент
+    document.getElementById('mainContent').style.display = 'block';
+    
+    // Обновляем информацию о пользователе
+    updateUserInfo();
+    
+    // Загружаем данные
+    loadDashboardData();
+    loadAgentsTable();
+    loadTasksGrid();
+    
+    // Показываем статус, если пользователь ожидает одобрения
+    if (currentUser.status === 'pending') {
+        showRegistrationStatus();
+    }
+    
+    // Показываем админ панель, если пользователь админ
+    if (currentUser.isAdmin) {
+        document.querySelector('.admin-only').style.display = 'flex';
+        loadAdminPanel();
+    }
+}
+
+// Обновление информации о пользователе в шапке
+function updateUserInfo() {
+    document.getElementById('userName').textContent = currentUser.username;
+    document.getElementById('userRank').textContent = currentUser.rank;
+    
+    // Обновляем аватар
+    const avatarIcon = document.querySelector('.user-avatar i');
+    if (currentUser.character === 'director') {
+        avatarIcon.className = 'fas fa-crown';
+    } else if (currentUser.character === 'detective') {
+        avatarIcon.className = 'fas fa-search';
+    } else if (currentUser.character === 'field_agent') {
+        avatarIcon.className = 'fas fa-running';
+    } else if (currentUser.character === 'analyst') {
+        avatarIcon.className = 'fas fa-chart-bar';
+    }
+}
+
+// Настройка навигации
+function setupNavigation() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Убираем активный класс у всех ссылок
+            navLinks.forEach(l => l.classList.remove('active'));
+            
+            // Добавляем активный класс текущей ссылке
+            this.classList.add('active');
+            
+            // Скрываем все страницы
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => page.classList.remove('active'));
+            
+            // Показываем выбранную страницу
+            const pageId = this.getAttribute('data-page');
+            document.getElementById(pageId).classList.add('active');
+        });
+    });
+}
+
+// Настройка обработчиков событий
+function setupEventHandlers() {
+    // Кнопка выхода
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    
+    // Форма входа
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        loginUser();
+    });
+    
+    // Форма регистрации
+    document.getElementById('registerForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        registerNewUser();
+    });
+    
+    // Кнопки закрытия модальных окон
+    document.querySelectorAll('.close-modal').forEach(button => {
+        button.addEventListener('click', function() {
+            const modal = this.closest('.modal');
+            modal.style.display = 'none';
+        });
+    });
+    
+    // Закрытие модальных окон при клике вне окна
+    window.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal')) {
+            e.target.style.display = 'none';
+        }
+    });
+    
+    // Поиск агентов
+    document.getElementById('searchAgent').addEventListener('input', function() {
+        filterAgents(this.value);
+    });
+    
+    // Фильтры по рангу
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            filterByRank(this.getAttribute('data-rank'));
+        });
+    });
+    
+    // Фильтр заданий
+    document.getElementById('taskFilter').addEventListener('change', function() {
+        filterTasks(this.value);
+    });
+    
+    // Админ вкладки
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const tabId = this.getAttribute('data-tab');
+            switchAdminTab(tabId);
+        });
+    });
+}
+
+// Показать модальное окно
+function showModal(modalId) {
+    document.getElementById(modalId).style.display = 'flex';
+}
+
+// Закрыть модальное окно
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+// Показать окно регистрации
+function showRegisterModal() {
+    closeModal('loginModal');
+    showModal('registerModal');
+}
+
+// Вход пользователя
+function loginUser() {
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    const loginStatus = document.getElementById('loginStatus');
+    
+    // Поиск пользователя
+    const user = allUsers.find(u => u.email === email && u.password === password);
+    
+    if (!user) {
+        loginStatus.innerHTML = '<p style="color: var(--danger-color);">Неверный email или пароль</p>';
+        return;
+    }
+    
+    // Проверка статуса пользователя
+    if (user.status === 'pending') {
+        loginStatus.innerHTML = `
+            <div style="background: rgba(255,170,0,0.1); padding: 10px; border-radius: 8px; border-left: 4px solid var(--warning-color);">
+                <p style="color: var(--warning-color); margin: 0;">
+                    <i class="fas fa-clock"></i> Ваша заявка на рассмотрении
+                </p>
+                <button onclick="showRegistrationStatus()" class="btn btn-secondary" style="margin-top: 10px; width: 100%;">
+                    Проверить статус
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    if (user.status === 'rejected') {
+        loginStatus.innerHTML = '<p style="color: var(--danger-color);">Ваша заявка отклонена. Обратитесь к руководству.</p>';
+        return;
+    }
+    
+    // Успешный вход
+    currentUser = user;
+    saveToLocalStorage();
+    closeModal('loginModal');
+    initializeApp();
+}
+
+// Регистрация нового пользователя
+function registerNewUser() {
+    const username = document.getElementById('regUsername').value;
+    const email = document.getElementById('regEmail').value;
+    const password = document.getElementById('regPassword').value;
+    const confirmPassword = document.getElementById('regConfirm').value;
+    const character = document.getElementById('regCharacter').value;
+    const motivation = document.getElementById('regMotivation').value;
+    
+    // Проверка паролей
+    if (password !== confirmPassword) {
+        alert('Пароли не совпадают!');
+        return;
+    }
+    
+    if (password.length < 8) {
+        alert('Пароль должен содержать минимум 8 символов!');
+        return;
+    }
+    
+    // Проверка, существует ли пользователь
+    if (allUsers.some(u => u.email === email)) {
+        alert('Пользователь с таким email уже существует!');
+        return;
+    }
+    
+    if (allUsers.some(u => u.username === username)) {
+        alert('Это имя пользователя уже занято!');
+        return;
+    }
+    
+    // Создание новой заявки на регистрацию
+    const newRegistration = {
+        id: Date.now(),
+        username: username,
+        email: email,
+        password: password,
+        character: character,
+        motivation: motivation,
+        status: 'pending',
+        submittedAt: new Date().toLocaleDateString('ru-RU'),
+        rank: 'Новичок',
+        completedTasks: 0
+    };
+    
+    // Добавление в список ожидающих одобрения
+    pendingRegistrations.push(newRegistration);
+    
+    // Сохранение в localStorage
+    saveToLocalStorage();
+    
+    // Показ сообщения об успехе
+    alert('Заявка успешно отправлена! Ожидайте одобрения руководства.');
+    
+    // Закрытие окна регистрации
+    closeModal('registerModal');
+    
+    // Показ окна входа
+    showModal('loginModal');
+    
+    // Обновление админ панели, если есть админы онлайн
+    if (currentUser && currentUser.isAdmin) {
+        loadAdminPanel();
+    }
+}
+
+// Показать статус регистрации
+function showRegistrationStatus() {
+    const modal = document.getElementById('statusModal');
+    const content = document.getElementById('statusContent');
+    
+    let statusHTML = '';
+    
+    if (currentUser) {
+        if (currentUser.status === 'pending') {
+            statusHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 3rem; color: var(--warning-color); margin-bottom: 20px;">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <h3 style="color: var(--warning-color); margin-bottom: 15px;">Заявка на рассмотрении</h3>
+                    <p style="color: var(--text-gray); margin-bottom: 20px;">
+                        Ваша заявка находится на рассмотрении руководства ФБР.
+                        Обычно это занимает 1-2 дня.
+                    </p>
+                    <div style="background: rgba(255,170,0,0.1); padding: 15px; border-radius: 8px; text-align: left; margin-top: 20px;">
+                        <p><strong>Имя:</strong> ${currentUser.username}</p>
+                        <p><strong>Email:</strong> ${currentUser.email}</p>
+                        <p><strong>Дата подачи:</strong> ${new Date().toLocaleDateString('ru-RU')}</p>
+                    </div>
+                </div>
+            `;
+        } else if (currentUser.status === 'approved') {
+            statusHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 3rem; color: var(--accent-color); margin-bottom: 20px;">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h3 style="color: var(--accent-color); margin-bottom: 15px;">Заявка одобрена!</h3>
+                    <p style="color: var(--text-gray); margin-bottom: 20px;">
+                        Поздравляем! Вы приняты в ФБР. Теперь у вас есть доступ ко всем функциям системы.
+                    </p>
+                </div>
+            `;
+        }
+    } else {
+        // Поиск в pendingRegistrations
+        const email = document.getElementById('loginEmail')?.value;
+        const pendingUser = pendingRegistrations.find(r => r.email === email);
+        
+        if (pendingUser) {
+            statusHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 3rem; color: var(--warning-color); margin-bottom: 20px;">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <h3 style="color: var(--warning-color); margin-bottom: 15px;">Заявка на рассмотрении</h3>
+                    <p style="color: var(--text-gray); margin-bottom: 20px;">
+                        Ваша заявка находится на рассмотрении руководства ФБР.
+                    </p>
+                    <div style="background: rgba(255,170,0,0.1); padding: 15px; border-radius: 8px; text-align: left; margin-top: 20px;">
+                        <p><strong>Имя:</strong> ${pendingUser.username}</p>
+                        <p><strong>Email:</strong> ${pendingUser.email}</p>
+                        <p><strong>Дата подачи:</strong> ${pendingUser.submittedAt}</p>
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    content.innerHTML = statusHTML;
+    showModal('statusModal');
+}
+
+// Выход из системы
+function logout() {
+    if (confirm('Вы уверены, что хотите выйти?')) {
+        currentUser = null;
+        localStorage.removeItem('fbr_currentUser');
+        document.getElementById('mainContent').style.display = 'none';
+        showModal('loginModal');
+    }
+}
+
+// Загрузка данных для дашборда
+function loadDashboardData() {
+    const approvedUsers = allUsers.filter(u => u.status === 'approved');
+    const pendingCount = pendingRegistrations.length;
+    
+    document.getElementById('totalAgents').textContent = approvedUsers.length;
+    document.getElementById('activeTasks').textContent = allTasks.filter(t => t.status === 'active').length;
+    document.getElementById('pendingApprovals').textContent = pendingCount;
+    document.getElementById('completedMissions').textContent = approvedUsers.reduce((sum, user) => sum + (user.completedTasks || 0), 0);
+    
+    // Обновление бейджа
+    document.getElementById('pendingCount').textContent = pendingCount;
+    
+    // Обновление статуса пользователя
+    const statusInfo = document.getElementById('userStatusInfo');
+    if (currentUser.status === 'pending') {
+        statusInfo.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px; color: var(--warning-color);">
+                <i class="fas fa-clock"></i>
+                <div>
+                    <strong>Статус:</strong> Ожидание одобрения
+                    <p style="margin: 5px 0 0 0; font-size: 0.9em; color: var(--text-gray);">
+                        Ваша заявка рассматривается руководством. Ожидайте решения.
+                    </p>
+                </div>
+            </div>
+        `;
+    } else if (currentUser.status === 'approved') {
+        statusInfo.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px; color: var(--accent-color);">
+                <i class="fas fa-check-circle"></i>
+                <div>
+                    <strong>Статус:</strong> Активный агент
+                    <p style="margin: 5px 0 0 0; font-size: 0.9em; color: var(--text-gray);">
+                        Добро пожаловать в ФБР, агент ${currentUser.username}!
+                    </p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Загрузка таблицы агентов
+function loadAgentsTable() {
+    const tbody = document.getElementById('agentsTableBody');
+    const approvedUsers = allUsers.filter(u => u.status === 'approved');
+    
+    tbody.innerHTML = approvedUsers.map(user => `
+        <tr>
+            <td>${user.id}</td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 35px; height: 35px; background: linear-gradient(135deg, var(--primary-color), var(--accent-color)); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <strong>${user.username}</strong>
+                        <div style="font-size: 0.8em; color: var(--text-gray);">${user.email}</div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <span class="status-${user.rank === 'Директор ФБР' ? 'approved' : 'completed'}">
+                    ${user.rank}
+                </span>
+            </td>
+            <td>${user.joinDate}</td>
+            <td>
+                <span class="status-approved">
+                    <i class="fas fa-check-circle"></i> Активен
+                </span>
+            </td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <span>${user.completedTasks || 0}</span>
+                    <i class="fas fa-star" style="color: var(--warning-color);"></i>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Фильтрация агентов по поиску
+function filterAgents(searchTerm) {
+    const rows = document.querySelectorAll('#agentsTableBody tr');
+    const term = searchTerm.toLowerCase();
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(term) ? '' : 'none';
+    });
+}
+
+// Фильтрация по рангу
+function filterByRank(rank) {
+    const rows = document.querySelectorAll('#agentsTableBody tr');
+    
+    if (rank === 'all') {
+        rows.forEach(row => row.style.display = '');
+        return;
+    }
+    
+    rows.forEach(row => {
+        const rankCell = row.querySelector('td:nth-child(3)');
+        if (rankCell && rankCell.textContent.includes(rank)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Обновление списка агентов
+function refreshAgents() {
+    loadAgentsTable();
+    showNotification('Список агентов обновлен', 'success');
+}
+
+// Загрузка заданий
+function loadTasksGrid() {
+    const grid = document.getElementById('tasksGrid');
+    
+    // Определяем, какие задания доступны пользователю
+    const availableTasks = allTasks.filter(task => {
+        if (currentUser.status !== 'approved') return false;
+        
+        // Проверяем ранг
+        const rankOrder = ['Новичок', 'Агент', 'Спецагент', 'Директор'];
+        const userRankIndex = rankOrder.indexOf(currentUser.rank.split(' ')[0]);
+        const taskRankIndex = rankOrder.indexOf(task.requiredRank);
+        
+        return userRankIndex >= taskRankIndex && task.status === 'available';
+    });
+    
+    grid.innerHTML = availableTasks.map(task => `
+        <div class="task-card">
+            <div class="task-header">
+                <h3 class="task-title">${task.title}</h3>
+                <span class="task-difficulty difficulty-${task.difficulty}">
+                    ${task.difficulty === 'easy' ? 'Легко' : task.difficulty === 'medium' ? 'Средне' : 'Сложно'}
+                </span>
+            </div>
+            
+            <p class="task-description">${task.description}</p>
+            
+            <div class="task-meta">
+                <div class="meta-item">
+                    <i class="fas fa-medal"></i>
+                    <span>Ранг: <strong>${task.requiredRank}</strong></span>
+                </div>
+                <div class="meta-item">
+                    <i class="fas fa-gem"></i>
+                    <span class="task-reward">${task.reward}</span>
+                </div>
+            </div>
+            
+            <div class="task-actions">
+                <button class="btn btn-primary btn-small" onclick="takeTask(${task.id})">
+                    <i class="fas fa-play"></i> Взять задание
+                </button>
+                <button class="btn btn-secondary btn-small" onclick="viewTaskDetails(${task.id})">
+                    <i class="fas fa-info-circle"></i> Подробнее
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Фильтрация заданий
+function filterTasks(filter) {
+    const taskCards = document.querySelectorAll('.task-card');
+    
+    taskCards.forEach(card => {
+        if (filter === 'all') {
+            card.style.display = 'block';
+        } else {
+            // Здесь можно добавить логику фильтрации
+            card.style.display = 'block';
+        }
+    });
+}
+
+// Взять задание
+function takeTask(taskId) {
+    const task = allTasks.find(t => t.id === taskId);
+    
+    if (!task) {
+        showNotification('Задание не найдено', 'error');
+        return;
+    }
+    
+    if (task.status !== 'available') {
+        showNotification('Это задание уже занято', 'warning');
+        return;
+    }
+    
+    // Обновляем статус задания
+    task.status = 'active';
+    task.assignedTo = currentUser.id;
+    task.assignedAt = new Date().toLocaleDateString('ru-RU');
+    
+    // Сохраняем изменения
+    saveToLocalStorage();
+    
+    // Показываем модальное окно задания
+    document.getElementById('modalTaskTitle').textContent = task.title;
+    document.getElementById('modalTaskDesc').textContent = task.description;
+    document.getElementById('modalTaskDifficulty').textContent = 
+        task.difficulty === 'easy' ? 'Легко' : task.difficulty === 'medium' ? 'Средне' : 'Сложно';
+    document.getElementById('modalTaskRank').textContent = task.requiredRank;
+    document.getElementById('modalTaskReward').textContent = task.reward;
+    
+    // Настройка обработчиков для кнопок модального окна
+    document.getElementById('submitProofBtn').onclick = function() {
+        submitTaskProof(taskId);
+    };
+    
+    document.getElementById('cancelTaskBtn').onclick = function() {
+        cancelTask(taskId);
+    };
+    
+    showModal('taskModal');
+}
+
+// Просмотр деталей задания
+function viewTaskDetails(taskId) {
+    const task = allTasks.find(t => t.id === taskId);
+    
+    if (!task) return;
+    
+    document.getElementById('modalTaskTitle').textContent = task.title;
+    document.getElementById('modalTaskDesc').textContent = task.description;
+    document.getElementById('modalTaskDifficulty').textContent = 
+        task.difficulty === 'easy' ? 'Легко' : task.difficulty === 'medium' ? 'Средне' : 'Сложно';
+    document.getElementById('modalTaskRank').textContent = task.requiredRank;
+    document.getElementById('modalTaskReward').textContent = task.reward;
+    
+    // Скрываем кнопки, если задание не активно
+    if (task.status !== 'active' || task.assignedTo !== currentUser.id) {
+        document.querySelector('.proof-section').style.display = 'none';
+    } else {
+        document.querySelector('.proof-section').style.display = 'block';
+    }
+    
+    showModal('taskModal');
+}
+
+// Отправить доказательство выполнения
+function submitTaskProof(taskId) {
+    const proofText = document.getElementById('proofText').value;
+    
+    if (!proofText.trim()) {
+        showNotification('Введите доказательства выполнения', 'warning');
+        return;
+    }
+    
+    const task = allTasks.find(t => t.id === taskId);
+    
+    if (!task || task.assignedTo !== currentUser.id) {
+        showNotification('Ошибка: задание не найдено', 'error');
+        return;
+    }
+    
+    // Обновляем задание
+    task.status = 'pending_review';
+    task.proof = proofText;
+    task.submittedAt = new Date().toLocaleDateString('ru-RU');
+    
+    // Сохраняем
+    saveToLocalStorage();
+    
+    // Закрываем модальное окно
+    closeModal('taskModal');
+    
+    // Показываем уведомление
+    showNotification('Доказательства отправлены на проверку', 'success');
+    
+    // Обновляем список заданий
+    loadTasksGrid();
+}
+
+// Отмена задания
+function cancelTask(taskId) {
+    if (!confirm('Вы уверены, что хотите отменить задание?')) return;
+    
+    const task = allTasks.find(t => t.id === taskId);
+    
+    if (task) {
+        task.status = 'available';
+        task.assignedTo = null;
+        task.assignedAt = null;
+        
+        saveToLocalStorage();
+        closeModal('taskModal');
+        loadTasksGrid();
+        showNotification('Задание отменено', 'info');
+    }
+}
+
+// Загрузка админ панели
+function loadAdminPanel() {
+    if (!currentUser.isAdmin) return;
+    
+    loadRegistrationsList();
+    loadAdminAgents();
+}
+
+// Загрузка списка заявок на регистрацию
+function loadRegistrationsList() {
+    const list = document.getElementById('registrationsList');
+    
+    if (pendingRegistrations.length === 0) {
+        list.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--text-gray);">
+                <i class="fas fa-check-circle" style="font-size: 3rem; margin-bottom: 20px; color: var(--accent-color);"></i>
+                <h3>Нет новых заявок</h3>
+                <p>Все заявки обработаны</p>
+            </div>
+        `;
+        return;
+    }
+    
+    list.innerHTML = pendingRegistrations.map(reg => `
+        <div class="registration-item" id="reg-${reg.id}">
+            <div class="registration-info">
+                <h4>${reg.username}</h4>
+                <p><i class="fas fa-envelope"></i> ${reg.email}</p>
+                <p><i class="fas fa-user-tag"></i> ${getCharacterName(reg.character)}</p>
+                <p><i class="fas fa-calendar"></i> Подана: ${reg.submittedAt}</p>
+                ${reg.motivation ? `<p><i class="fas fa-comment"></i> ${reg.motivation}</p>` : ''}
+            </div>
+            <div class="registration-actions">
+                <button class="btn btn-primary" onclick="approveRegistration(${reg.id})">
+                    <i class="fas fa-check"></i> Одобрить
+                </button>
+                <button class="btn btn-secondary" onclick="rejectRegistration(${reg.id})">
+                    <i class="fas fa-times"></i> Отклонить
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Получение названия роли
+function getCharacterName(character) {
+    const names = {
+        'detective': 'Детектив',
+        'field_agent': 'Полевой агент',
+        'analyst': 'Аналитик',
+        'tech': 'Технический специалист',
+        'director': 'Директор'
+    };
+    return names[character] || 'Неизвестно';
+}
+
+// Одобрение регистрации
+function approveRegistration(registrationId) {
+    const regIndex = pendingRegistrations.findIndex(r => r.id === registrationId);
+    
+    if (regIndex === -1) return;
+    
+    const registration = pendingRegistrations[regIndex];
+    
+    // Создание нового пользователя
+    const newUser = {
+        id: allUsers.length + 1,
+        username: registration.username,
+        email: registration.email,
+        password: registration.password,
+        rank: registration.rank,
+        joinDate: new Date().toLocaleDateString('ru-RU'),
+        status: 'approved',
+        isAdmin: false,
+        completedTasks: 0,
+        character: registration.character
+    };
+    
+    // Добавление в список пользователей
+    allUsers.push(newUser);
+    
+    // Удаление из списка ожидания
+    pendingRegistrations.splice(regIndex, 1);
+    
+    // Сохранение
+    saveToLocalStorage();
+    
+    // Обновление интерфейса
+    loadRegistrationsList();
+    loadDashboardData();
+    loadAgentsTable();
+    
+    showNotification('Регистрация одобрена', 'success');
+}
+
+// Отклонение регистрации
+function rejectRegistration(registrationId) {
+    const reason = prompt('Укажите причину отказа:');
+    
+    if (reason === null) return; // Пользователь нажал "Отмена"
+    
+    const regIndex = pendingRegistrations.findIndex(r => r.id === registrationId);
+    
+    if (regIndex === -1) return;
+    
+    const registration = pendingRegistrations[regIndex];
+    
+    // Можно сохранить отклоненные заявки в отдельный список
+    registration.status = 'rejected';
+    registration.rejectionReason = reason;
+    registration.rejectedAt = new Date().toLocaleDateString('ru-RU');
+    
+    // Удаление из списка ожидания
+    pendingRegistrations.splice(regIndex, 1);
+    
+    // Сохранение
+    saveToLocalStorage();
+    
+    // Обновление интерфейса
+    loadRegistrationsList();
+    loadDashboardData();
+    
+    showNotification('Регистрация отклонена', 'info');
+}
+
+// Загрузка управления агентами для админа
+function loadAdminAgents() {
+    const management = document.getElementById('agentsManagement');
+    
+    management.innerHTML = `
+        <div class="agents-admin-list">
+            ${allUsers.filter(u => u.status === 'approved').map(user => `
+                <div class="admin-agent-card">
+                    <div class="agent-info">
+                        <h4>${user.username}</h4>
+                        <p>Ранг: ${user.rank}</p>
+                        <p>Выполнено заданий: ${user.completedTasks || 0}</p>
+                    </div>
+                    <div class="agent-actions">
+                        <select onchange="changeUserRank(${user.id}, this.value)" class="rank-select">
+                            <option value="Новичок" ${user.rank === 'Новичок' ? 'selected' : ''}>Новичок</option>
+                            <option value="Агент" ${user.rank === 'Агент' ? 'selected' : ''}>Агент</option>
+                            <option value="Спецагент" ${user.rank === 'Спецагент' ? 'selected' : ''}>Спецагент</option>
+                            <option value="Директор" ${user.rank === 'Директор' ? 'selected' : ''}>Директор</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="removeUser(${user.id})" ${user.isAdmin ? 'disabled' : ''}>
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// Изменение ранга пользователя
+function changeUserRank(userId, newRank) {
+    const user = allUsers.find(u => u.id === userId);
+    
+    if (user) {
+        user.rank = newRank;
+        saveToLocalStorage();
+        loadAdminAgents();
+        loadAgentsTable();
+        showNotification(`Ранг пользователя ${user.username} изменен на ${newRank}`, 'success');
+    }
+}
+
+// Удаление пользователя
+function removeUser(userId) {
+    if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) return;
+    
+    const userIndex = allUsers.findIndex(u => u.id === userId);
+    
+    if (userIndex !== -1) {
+        const username = allUsers[userIndex].username;
+        allUsers.splice(userIndex, 1);
+        saveToLocalStorage();
+        loadAdminAgents();
+        loadAgentsTable();
+        showNotification(`Пользователь ${username} удален`, 'success');
+    }
+}
+
+// Переключение вкладок админ панели
+function switchAdminTab(tabId) {
+    // Обновляем активную вкладку
+    document.querySelectorAll('.admin-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+    
+    // Показываем соответствующее содержимое
+    document.querySelectorAll('.admin-tab-content').forEach(content => content.classList.remove('active'));
+    document.getElementById(`${tabId}Tab`).classList.add('active');
+}
+
+// Создание нового задания
+function createNewTask() {
+    const title = document.getElementById('newTaskTitle').value;
+    const description = document.getElementById('newTaskDesc').value;
+    const rank = document.getElementById('newTaskRank').value;
+    
+    if (!title || !description) {
+        showNotification('Заполните все поля', 'warning');
+        return;
+    }
+    
+    const newTask = {
+        id: allTasks.length + 1,
+        title: title,
+        description: description,
+        difficulty: 'medium',
+        requiredRank: rank,
+        reward: 'Опыт и повышение',
+        status: 'available'
+    };
+    
+    allTasks.push(newTask);
+    saveToLocalStorage();
+    
+    // Очищаем поля
+    document.getElementById('newTaskTitle').value = '';
+    document.getElementById('newTaskDesc').value = '';
+    
+    // Обновляем интерфейс
+    loadTasksGrid();
+    showNotification('Новое задание создано', 'success');
+}
+
+// Показать уведомление
+function showNotification(message, type = 'info') {
+    // Создаем элемент уведомления
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    // Добавляем стили
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? 'var(--accent-color)' : type === 'error' ? 'var(--danger-color)' : 'var(--primary-color)'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 10000;
+        animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s;
+        animation-fill-mode: forwards;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    `;
+    
+    // Добавляем на страницу
+    document.body.appendChild(notification);
+    
+    // Удаляем через 3 секунды
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 3000);
+    
+    // Добавляем стили анимации
+    if (!document.querySelector('#notification-styles')) {
+        const style = document.createElement('style');
+        style.id = 'notification-styles';
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes fadeOut {
+                to { opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// Экспорт данных (для админа)
+function exportData() {
+    if (!currentUser.isAdmin) {
+        showNotification('Только для руководства', 'error');
+        return;
+    }
+    
+    const data = {
+        users: allUsers,
+        tasks: allTasks,
+        registrations: pendingRegistrations,
+        exportedAt: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fbr-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showNotification('Данные экспортированы', 'success');
+}
+
+// Импорт данных (для админа)
+function importData(event) {
+    if (!currentUser.isAdmin) {
+        showNotification('Только для руководства', 'error');
+        return;
+    }
+    
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            
+            if (confirm('Вы уверены? Это перезапишет все текущие данные.')) {
+                allUsers = data.users || DEFAULT_USERS;
+                allTasks = data.tasks || DEFAULT_TASKS;
+                pendingRegistrations = data.registrations || [];
+                
+                saveToLocalStorage();
+                initializeApp();
+                
+                showNotification('Данные успешно импортированы', 'success');
+            }
+        } catch (error) {
+            showNotification('Ошибка при чтении файла', 'error');
+            console.error(error);
+        }
+    };
+    reader.readAsText(file);
+    
+    // Сбрасываем input
+    event.target.value = '';
+}
